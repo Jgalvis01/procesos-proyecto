@@ -83,7 +83,10 @@ export const useCustomers = (): UseCustomersReturn => {
 
   // Crear cliente
   const createCustomer = async (data: ClienteFormData): Promise<{ success: boolean; error?: string; customer?: Cliente }> => {
+    console.log('🔧 useCustomers - createCustomer llamado con:', data)
+    
     if (!org?.id) {
+      console.error('❌ No hay organización seleccionada')
       return { success: false, error: 'No hay organización seleccionada' }
     }
 
@@ -97,17 +100,20 @@ export const useCustomers = (): UseCustomersReturn => {
         correo: data.correo?.trim() || null,
       }
 
+      console.log('🔧 Datos de cliente a insertar:', customerData)
       const { data: insertedData, error: insertError } = await insertCliente(customerData)
 
       if (insertError) {
+        console.error('❌ Error insertando cliente:', insertError)
         return { success: false, error: insertError.message }
       }
 
+      console.log('✅ Cliente insertado exitosamente:', insertedData)
       // Recargar clientes después de crear
       await loadCustomers()
       return { success: true, customer: insertedData }
     } catch (err) {
-      console.error('Error creating customer:', err)
+      console.error('❌ Error creating customer:', err)
       return { success: false, error: 'Error inesperado al crear el cliente' }
     }
   }

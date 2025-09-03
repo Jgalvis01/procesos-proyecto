@@ -1,6 +1,6 @@
 // src/pages/Products.tsx
 import React, { useState } from 'react'
-import type { ProductList, ProductForm } from '../components/products'
+import { ProductList, ProductForm } from '../components/products'
 import type { Producto } from '../lib/database.types'
 
 const ProductsPage: React.FC = () => {

@@ -12,6 +12,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error?: string }>
   signOut: () => Promise<void>
   hasPermission: (requiredRoles: UserRole[]) => boolean
+  refreshSession: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -22,6 +23,7 @@ const AuthContext = createContext<AuthContextType>({
   signIn: async () => ({ error: 'Not implemented' }),
   signOut: async () => {},
   hasPermission: () => false,
+  refreshSession: async () => {},
 })
 
 export const useAuth = () => {
@@ -42,17 +44,59 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [org, setOrg] = useState<{ id: string; nombre: string } | null>(null)
   const [loading, setLoading] = useState(true)
 
+  console.log('🔧 AuthProvider - Current state:', { user: !!user, role, loading })
+
   useEffect(() => {
-    // Obtener sesión inicial
+    console.log('🔧 AuthProvider - useEffect iniciado')
+    
+    // Obtener sesión inicial con persistencia mejorada
     const getInitialSession = async () => {
       try {
-        const { user: currentUser, role: userRole, org: userOrg } = await getCurrentUserWithRole()
-        setUser(currentUser)
-        setRole(userRole)
-        setOrg(userOrg)
+        console.log('🔧 AuthProvider - Obteniendo sesión inicial...')
+        
+        // Verificar si hay una sesión válida
+        const session = await supabase.auth.getSession()
+        if (session.data.session?.user) {
+          console.log('🔧 Sesión válida encontrada')
+          setUser(session.data.session.user as any)
+          
+          // Intentar obtener datos adicionales
+          try {
+            const { user: currentUser, role: userRole, org: userOrg } = await getCurrentUserWithRole()
+            if (currentUser && userRole && userOrg) {
+              setUser(currentUser)
+              setRole(userRole)
+              setOrg(userOrg)
+              console.log('✅ Datos completos del usuario obtenidos')
+            } else {
+              // Si no podemos obtener los datos adicionales, usar valores por defecto
+              console.warn('⚠️ No se pudieron obtener datos adicionales, usando valores por defecto')
+              setRole('cashier') // Rol por defecto
+              setOrg({ id: 'default', nombre: 'Organización Principal' })
+            }
+          } catch (roleError) {
+            console.warn('⚠️ Error obteniendo datos adicionales, usando valores por defecto:', roleError)
+            // Mantener la sesión básica con valores por defecto
+            setRole('cashier')
+            setOrg({ id: 'default', nombre: 'Organización Principal' })
+          }
+          
+          setLoading(false)
+          return
+        }
+        
+        // Si no hay sesión válida, mostrar login
+        console.log('❌ No hay sesión válida, mostrando login')
+        setUser(null)
+        setRole(null)
+        setOrg(null)
+        setLoading(false)
+        
       } catch (error) {
-        console.error('Error getting initial session:', error)
-      } finally {
+        console.error('❌ Error crítico en sesión inicial:', error)
+        setUser(null)
+        setRole(null)
+        setOrg(null)
         setLoading(false)
       }
     }
@@ -62,38 +106,71 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // Escuchar cambios de autenticación
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('🔧 Auth state change:', event, !!session)
+        
         if (event === 'SIGNED_IN' && session?.user) {
-          const { user: currentUser, role: userRole, org: userOrg } = await getCurrentUserWithRole()
-          setUser(currentUser)
-          setRole(userRole)
-          setOrg(userOrg)
+          setUser(session.user as any)
+          
+          try {
+            const { user: currentUser, role: userRole, org: userOrg } = await getCurrentUserWithRole()
+            if (currentUser && userRole && userOrg) {
+              setUser(currentUser)
+              setRole(userRole)
+              setOrg(userOrg)
+              console.log('✅ Login completo exitoso')
+            } else {
+              // Usar valores por defecto si no se pueden obtener
+              setRole('cashier')
+              setOrg({ id: 'default', nombre: 'Organización Principal' })
+              console.log('✅ Login con valores por defecto')
+            }
+          } catch (error) {
+            console.warn('⚠️ Error obteniendo datos adicionales en login:', error)
+            setRole('cashier')
+            setOrg({ id: 'default', nombre: 'Organización Principal' })
+          }
         } else if (event === 'SIGNED_OUT') {
+          console.log('🔓 Usuario cerró sesión manualmente')
           setUser(null)
           setRole(null)
           setOrg(null)
+        } else if (event === 'TOKEN_REFRESHED') {
+          console.log('� Token refrescado - sesión manteniéndose')
+          // No limpiar el estado en refresh de token
         }
         setLoading(false)
       }
     )
 
-    return () => subscription.unsubscribe()
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [])
 
   const signIn = async (email: string, password: string) => {
     try {
       setLoading(true)
+      console.log('🔑 Intentando iniciar sesión...')
+      
+      // Limpiar cualquier sesión previa corrupta
+      await supabase.auth.signOut()
+      localStorage.clear()
+      
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
       
       if (error) {
+        console.error('❌ Error en login:', error.message)
         return { error: error.message }
       }
 
+      console.log('✅ Login exitoso')
       // La actualización del estado se maneja en el listener onAuthStateChange
       return {}
     } catch (error) {
+      console.error('❌ Error inesperado en login:', error)
       return { error: 'Error inesperado al iniciar sesión' }
     } finally {
       setLoading(false)
@@ -103,10 +180,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const signOut = async () => {
     try {
       setLoading(true)
+      console.log('🔓 Cerrando sesión...')
+      
+      // Limpiar localStorage antes de cerrar sesión
+      localStorage.clear()
+      
       await supabase.auth.signOut()
-      // La limpieza del estado se maneja en el listener onAuthStateChange
+      
+      // Asegurar que el estado se limpia
+      setUser(null)
+      setRole(null)
+      setOrg(null)
+      
+      console.log('✅ Sesión cerrada y estado limpiado')
     } catch (error) {
-      console.error('Error signing out:', error)
+      console.error('❌ Error signing out:', error)
+      // Aún así limpiar el estado local
+      localStorage.clear()
+      setUser(null)
+      setRole(null)
+      setOrg(null)
     } finally {
       setLoading(false)
     }
@@ -117,6 +210,44 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return requiredRoles.includes(role)
   }
 
+  // Función para refrescar sesión cuando hay errores de autenticación
+  const refreshSession = async () => {
+    console.log('🔄 Refrescando sesión...')
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession()
+      
+      if (error || !session) {
+        console.log('❌ No se pudo refrescar la sesión, limpiando estado')
+        setUser(null)
+        setRole(null)
+        setOrg(null)
+        return
+      }
+
+      console.log('✅ Sesión refrescada exitosamente')
+      setUser(session.user as any)
+      
+      // Intentar obtener datos adicionales
+      try {
+        const { user: currentUser, role: userRole, org: userOrg } = await getCurrentUserWithRole()
+        if (currentUser && userRole && userOrg) {
+          setUser(currentUser)
+          setRole(userRole)
+          setOrg(userOrg)
+        } else {
+          setRole('cashier')
+          setOrg({ id: 'default', nombre: 'Organización Principal' })
+        }
+      } catch (roleError) {
+        console.warn('⚠️ Error obteniendo datos adicionales en refresh:', roleError)
+        setRole('cashier')
+        setOrg({ id: 'default', nombre: 'Organización Principal' })
+      }
+    } catch (error) {
+      console.error('❌ Error refrescando sesión:', error)
+    }
+  }
+
   const value: AuthContextType = {
     user,
     role,
@@ -125,6 +256,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     signIn,
     signOut,
     hasPermission,
+    refreshSession
   }
 
   return (

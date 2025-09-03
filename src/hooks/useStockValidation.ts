@@ -31,11 +31,16 @@ export const useStockValidation = () => {
       }
     }
 
-    // Calcular stock disponible (recordar que stock negativo significa ventas)
-    const availableStock = Math.abs(product.stock)
+    // Calcular stock disponible 
+    const availableStock = product.stock
+    
+    console.log(`🔧 Validación de stock para producto ID ${productId}:`)
+    console.log(`   - Stock disponible: ${availableStock}`)
+    console.log(`   - Cantidad solicitada: ${requestedQuantity}`)
 
     // Validar si hay suficiente stock
-    if (requestedQuantity > availableStock) {
+    if (requestedQuantity > availableStock || availableStock <= 0) {
+      console.log(`❌ Stock insuficiente`)
       return {
         isValid: false,
         message: `Stock insuficiente. Stock disponible: ${availableStock}`,
@@ -43,6 +48,7 @@ export const useStockValidation = () => {
       }
     }
 
+    console.log(`✅ Stock suficiente`)
     // Si todo está bien
     return {
       isValid: true,

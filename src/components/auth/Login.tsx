@@ -2,6 +2,7 @@
 import React, { useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { Navigate } from 'react-router-dom'
+import LoadingScreen from '../LoadingScreen'
 
 const Login: React.FC = () => {
   const { user, signIn, loading } = useAuth()
@@ -32,15 +33,15 @@ const Login: React.FC = () => {
     }
   }
 
+  const handleClearData = () => {
+    localStorage.clear()
+    sessionStorage.clear()
+    // Recargar la página para reiniciar completamente el estado
+    window.location.reload()
+  }
+
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-2 text-gray-600">Cargando...</p>
-        </div>
-      </div>
-    )
+    return <LoadingScreen message="Cargando..." />
   }
 
   return (
@@ -121,6 +122,17 @@ const Login: React.FC = () => {
               ) : (
                 'Iniciar Sesión'
               )}
+            </button>
+          </div>
+
+          {/* Botón para limpiar datos si hay problemas */}
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={handleClearData}
+              className="w-full text-center text-sm text-gray-600 hover:text-gray-800 py-2 px-4 border border-gray-300 rounded-md hover:bg-gray-50"
+            >
+              ¿Problemas para iniciar sesión? Limpiar datos guardados
             </button>
           </div>
         </form>

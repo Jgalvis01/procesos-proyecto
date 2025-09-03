@@ -25,6 +25,14 @@ export interface ProductoFormData {
   codigo: string
   nombre: string
   precio: number
+  stock: number
+}
+
+export interface ProductoFormErrors {
+  codigo?: string
+  nombre?: string
+  precio?: string
+  stock?: string
 }
 
 interface UseProductsReturn {
@@ -33,7 +41,8 @@ interface UseProductsReturn {
   error: string | null
   createProduct: (data: ProductoFormData) => Promise<{ success: boolean; error?: string }>
   updateProduct: (id: number, data: ProductoFormData) => Promise<{ success: boolean; error?: string }>
-  deleteProduct: (id: number) => Promise<{ success: boolean; error?: string }>
+  deleteProduct: (id: number, force?: boolean) => Promise<{ success: boolean; error?: string; hasAssociatedSales?: boolean }>
+  toggleProductStatus: (id: number) => Promise<{ success: boolean; error?: string }>
   refreshProducts: () => Promise<void>
   searchProducts: (query: string) => Producto[]
 }
@@ -47,6 +56,7 @@ export const useProducts = (): UseProductsReturn => {
   // Cargar productos
   const loadProducts = async () => {
     if (!org?.id) {
+      console.log('⚠️ No hay org_id, no se pueden cargar productos')
       setProducts([])
       setLoading(false)
       return
@@ -56,11 +66,27 @@ export const useProducts = (): UseProductsReturn => {
       setLoading(true)
       setError(null)
       
+      console.log('🔧 Intentando cargar productos para org_id:', org.id)
+      
+      // Verificar autenticación antes de hacer la consulta
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      console.log('🔧 Estado de sesión (productos):', { 
+        hasSession: !!session, 
+        sessionError, 
+        userId: session?.user?.id 
+      })
+
+      if (!session) {
+        throw new Error('No hay sesión activa. Por favor, inicia sesión nuevamente.')
+      }
+      
       const { data, error: fetchError } = await supabase
         .from('producto')
         .select('*')
         .eq('org_id', org.id)
         .order('created_at', { ascending: false })
+
+      console.log('🔧 Respuesta de consulta productos:', { data, fetchError })
 
       if (fetchError) {
         setError(fetchError.message)
@@ -68,7 +94,9 @@ export const useProducts = (): UseProductsReturn => {
       }
 
       setProducts(data || [])
+      console.log('✅ Productos cargados exitosamente:', data?.length || 0)
     } catch (err) {
+      console.error('❌ Error cargando productos:', err)
       setError('Error cargando productos')
       console.error('Error loading products:', err)
     } finally {
@@ -83,7 +111,10 @@ export const useProducts = (): UseProductsReturn => {
 
   // Crear producto
   const createProduct = async (data: ProductoFormData): Promise<{ success: boolean; error?: string }> => {
+    console.log('🔧 useProducts - createProduct llamado con:', data)
+    
     if (!org?.id) {
+      console.error('❌ No hay organización seleccionada')
       return { success: false, error: 'No hay organización seleccionada' }
     }
 
@@ -93,9 +124,11 @@ export const useProducts = (): UseProductsReturn => {
         org_id: org.id,
       }
 
+      console.log('🔧 Datos a insertar:', productData)
       const { error: insertError } = await insertProducto(productData)
 
       if (insertError) {
+        console.error('❌ Error insertando producto:', insertError)
         // Verificar si es error de duplicado de código
         if (insertError.code === '23505') {
           return { success: false, error: 'Ya existe un producto con este código' }
@@ -103,11 +136,12 @@ export const useProducts = (): UseProductsReturn => {
         return { success: false, error: insertError.message }
       }
 
+      console.log('✅ Producto insertado exitosamente')
       // Recargar productos después de crear
       await loadProducts()
       return { success: true }
     } catch (err) {
-      console.error('Error creating product:', err)
+      console.error('❌ Error creating product:', err)
       return { success: false, error: 'Error inesperado al crear el producto' }
     }
   }
@@ -144,31 +178,89 @@ export const useProducts = (): UseProductsReturn => {
   }
 
   // Eliminar producto
-  const deleteProduct = async (id: number): Promise<{ success: boolean; error?: string }> => {
+  const deleteProduct = async (id: number, force: boolean = false): Promise<{ success: boolean; error?: string; hasAssociatedSales?: boolean }> => {
     if (!org?.id) {
       return { success: false, error: 'No hay organización seleccionada' }
     }
 
     try {
+      console.log('🔧 Intentando eliminar producto ID:', id, 'Force:', force)
+      
+      // Verificar si el producto tiene ventas asociadas (solo si no es forzado)
+      if (!force) {
+        const { data: ventasAsociadas, error: checkError } = await supabase
+          .from('venta_item')
+          .select('id')
+          .eq('producto_id', id)
+          .limit(1)
+
+        if (checkError) {
+          console.error('❌ Error verificando ventas asociadas:', checkError)
+          return { success: false, error: 'Error verificando si el producto se puede eliminar' }
+        }
+
+        if (ventasAsociadas && ventasAsociadas.length > 0) {
+          console.log('⚠️ Producto tiene ventas asociadas, requiere confirmación')
+          return { 
+            success: false, 
+            hasAssociatedSales: true,
+            error: 'El producto tiene ventas registradas. ¿Estás seguro de que quieres eliminarlo? Esto puede afectar el historial de ventas.' 
+          }
+        }
+      }
+
+      // Proceder con la eliminación (normal o forzada)
+      if (force) {
+        // Si es eliminación forzada, primero eliminar los registros relacionados
+        console.log('🔧 Eliminación forzada: eliminando registros relacionados primero')
+        
+        // Eliminar items de venta asociados
+        const { error: deleteItemsError } = await supabase
+          .from('venta_item')
+          .delete()
+          .eq('producto_id', id)
+
+        if (deleteItemsError) {
+          console.error('❌ Error eliminando items de venta relacionados:', deleteItemsError)
+          return { 
+            success: false, 
+            error: 'Error eliminando registros relacionados. No se pudo completar la eliminación forzada.' 
+          }
+        }
+
+        console.log('✅ Items de venta relacionados eliminados')
+      }
+
+      // Proceder con la eliminación del producto
       const { error: deleteError } = await supabase
         .from('producto')
         .delete()
         .eq('id', id)
         .eq('org_id', org.id) // Asegurar que solo elimine productos de la org
 
+      console.log('🔧 Resultado eliminación:', { deleteError })
+
       if (deleteError) {
-        // Verificar si hay ventas asociadas
+        console.error('❌ Error eliminando producto:', deleteError)
+        
+        // Manejar diferentes tipos de errores
         if (deleteError.code === '23503') {
-          return { success: false, error: 'No se puede eliminar el producto porque tiene ventas asociadas' }
+          return { 
+            success: false, 
+            error: 'No se puede eliminar el producto. Existe una restricción de base de datos que lo impide.' 
+          }
+        } else if (deleteError.code === '409') {
+          return { success: false, error: 'El producto no se puede eliminar porque está en uso' }
         }
-        return { success: false, error: deleteError.message }
+        return { success: false, error: `Error eliminando producto: ${deleteError.message}` }
       }
 
+      console.log('✅ Producto eliminado exitosamente')
       // Recargar productos después de eliminar
       await loadProducts()
       return { success: true }
     } catch (err) {
-      console.error('Error deleting product:', err)
+      console.error('❌ Error deleting product:', err)
       return { success: false, error: 'Error inesperado al eliminar el producto' }
     }
   }
@@ -192,6 +284,57 @@ export const useProducts = (): UseProductsReturn => {
     )
   }
 
+  // Alternar estado activo/inactivo del producto
+  const toggleProductStatus = async (id: number): Promise<{ success: boolean; error?: string }> => {
+    if (!org?.id) {
+      return { success: false, error: 'No hay organización seleccionada' }
+    }
+
+    try {
+      console.log('🔧 Alternando estado del producto ID:', id)
+      
+      // Obtener el estado actual del producto
+      const { data: producto, error: getError } = await supabase
+        .from('producto')
+        .select('activo')
+        .eq('id', id)
+        .eq('org_id', org.id)
+        .single() as { data: { activo: boolean } | null, error: any }
+
+      if (getError) {
+        console.error('❌ Error obteniendo producto:', getError)
+        return { success: false, error: 'Error obteniendo información del producto' }
+      }
+
+      if (!producto) {
+        return { success: false, error: 'Producto no encontrado' }
+      }
+
+      // Alternar el estado
+      const nuevoEstado = !producto.activo
+      const updateResult = await (supabase as any)
+        .from('producto')
+        .update({ activo: nuevoEstado })
+        .eq('id', id)
+        .eq('org_id', org.id)
+      
+      const updateError = updateResult.error
+
+      if (updateError) {
+        console.error('❌ Error actualizando estado del producto:', updateError)
+        return { success: false, error: 'Error actualizando estado del producto' }
+      }
+
+      console.log(`✅ Producto ${nuevoEstado ? 'activado' : 'desactivado'} exitosamente`)
+      // Recargar productos después de cambiar estado
+      await loadProducts()
+      return { success: true }
+    } catch (err) {
+      console.error('❌ Error toggling product status:', err)
+      return { success: false, error: 'Error inesperado al cambiar estado del producto' }
+    }
+  }
+
   return {
     products,
     loading,
@@ -199,6 +342,7 @@ export const useProducts = (): UseProductsReturn => {
     createProduct,
     updateProduct,
     deleteProduct,
+    toggleProductStatus,
     refreshProducts,
     searchProducts,
   }

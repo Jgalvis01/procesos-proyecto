@@ -27,6 +27,8 @@ export function useInventory() {
       setLoading(true)
       setError(null)
 
+      console.log('🔧 useInventory - Cargando inventario para org:', org.id)
+
       // 1. Obtener todos los productos de la organización
       const { data: productos, error: productosError } = await supabase
         .from('producto')
@@ -35,6 +37,14 @@ export function useInventory() {
 
       if (productosError) throw productosError
       if (!productos) throw new Error('No se encontraron productos')
+
+      console.log('🔧 Productos obtenidos:', productos)
+      console.log('🔧 Primer producto:', productos[0])
+      
+      if (productos[0]) {
+        console.log('🔧 Campos del primer producto:', Object.keys(productos[0]))
+        console.log('🔧 Stock del primer producto:', (productos[0] as any).stock)
+      }
 
       // 2. Obtener todas las ventas de items para calcular el stock
       const { data: ventasItems, error: ventasError } = await supabase
@@ -63,12 +73,17 @@ export function useInventory() {
           0
         )
         
+        // Obtener stock inicial de la base de datos o usar 0 por defecto
+        const stockInicial = (producto as any).stock || 0
+        console.log(`🔧 Producto ${producto.nombre}: stockInicial=${stockInicial}, vendido=${stockVendido}`)
+        
         return {
           ...producto,
-          stock: -stockVendido // Stock negativo significa ventas
+          stock: stockInicial - stockVendido // Stock real = inicial - vendido
         }
       })
 
+      console.log('🔧 Inventario calculado:', inventario)
       setInventory(inventario)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al cargar el inventario')

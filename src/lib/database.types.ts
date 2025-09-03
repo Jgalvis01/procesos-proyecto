@@ -78,6 +78,8 @@ export interface Database {
           codigo: string
           nombre: string
           precio: number
+          stock: number
+          activo: boolean
           created_at: string
         }
         Insert: {
@@ -86,6 +88,8 @@ export interface Database {
           codigo: string
           nombre: string
           precio: number
+          stock?: number
+          activo?: boolean
           created_at?: string
         }
         Update: {
@@ -94,6 +98,8 @@ export interface Database {
           codigo?: string
           nombre?: string
           precio?: number
+          stock?: number
+          activo?: boolean
           created_at?: string
         }
       }
@@ -103,13 +109,15 @@ export interface Database {
           org_id: string
           cliente_id: number | null
           numero: string
+          total: number
           created_at: string
         }
         Insert: {
           id?: number
           org_id: string
           cliente_id?: number | null
-          numero: string
+          numero?: string
+          total?: number
           created_at?: string
         }
         Update: {
@@ -117,6 +125,7 @@ export interface Database {
           org_id?: string
           cliente_id?: number | null
           numero?: string
+          total?: number
           created_at?: string
         }
       }

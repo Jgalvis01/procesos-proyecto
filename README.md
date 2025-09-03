@@ -1,23 +1,92 @@
-# React + TypeScript + Vite
+# POS_PROCESOS - Sistema de Punto de Venta
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Sistema de punto de venta desarrollado con React + TypeScript + Vite + Supabase.
 
-Currently, two official plugins are available:
+## Características
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- ✅ Autenticación de usuarios con roles (admin, manager, cashier)
+- ✅ Gestión de productos e inventario
+- ✅ Gestión de clientes
+- ✅ Procesamiento de ventas
+- ✅ Dashboard con métricas
+- ✅ Interfaz responsive con Tailwind CSS
 
-## Expanding the ESLint configuration
+## Configuración del Proyecto
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### Prerrequisitos
 
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- Node.js (versión 18 o superior)
+- npm o yarn
+- Cuenta de Supabase
+
+### Instalación
+
+1. Clona el repositorio:
+```bash
+git clone https://github.com/marco2712/POS_PROCESOS.git
+cd POS_PROCESOS
+```
+
+2. Instala las dependencias:
+```bash
+npm install
+```
+
+3. Configura las variables de entorno:
+   - Copia el archivo `.env.example` a `.env`
+   - Actualiza las variables con tus credenciales de Supabase:
+
+```env
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+4. Inicia el servidor de desarrollo:
+```bash
+npm run dev
+```
+
+## Scripts Disponibles
+
+- `npm run dev` - Inicia el servidor de desarrollo
+- `npm run build` - Construye la aplicación para producción
+- `npm run lint` - Ejecuta ESLint para revisar el código
+- `npm run preview` - Vista previa de la aplicación construida
+
+## Tecnologías Utilizadas
+
+- **React** - Biblioteca de interfaz de usuario
+- **TypeScript** - Superset tipado de JavaScript
+- **Vite** - Herramienta de construcción rápida
+- **Supabase** - Backend como servicio (BaaS)
+- **React Router** - Enrutamiento del lado del cliente
+- **Tailwind CSS** - Framework de utilidades CSS
+
+## Estructura del Proyecto
+
+```
+src/
+├── components/          # Componentes reutilizables
+│   ├── auth/           # Componentes de autenticación
+│   ├── customers/      # Componentes de clientes
+│   ├── inventory/      # Componentes de inventario
+│   ├── products/       # Componentes de productos
+│   └── sales/          # Componentes de ventas
+├── contexts/           # Contextos de React
+├── hooks/              # Hooks personalizados
+├── lib/                # Configuraciones y utilidades
+├── pages/              # Páginas principales
+└── utils/              # Funciones de utilidad
+```
+
+## Estado del Proyecto
+
+✅ **Sin errores de compilación**
+✅ **ESLint configurado correctamente**
+✅ **TypeScript configurado sin errores**
+✅ **Servidor de desarrollo funcionando**
+
+⚠️ **Pendiente**: Configurar variables de entorno de Supabase
 
       // Remove tseslint.configs.recommended and replace with this
       ...tseslint.configs.recommendedTypeChecked,

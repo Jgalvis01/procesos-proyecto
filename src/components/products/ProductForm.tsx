@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react'
 import { useProducts} from '../../hooks/useProducts'
 import type{ Producto } from '../../lib/database.types'
-import type { ProductoFormData } from '../../hooks/useProducts'
+import type { ProductoFormData, ProductoFormErrors } from '../../hooks/useProducts'
 
 interface ProductFormProps {
   product?: Producto | null
@@ -20,10 +20,12 @@ const ProductForm: React.FC<ProductFormProps> = ({
     codigo: '',
     nombre: '',
     precio: 0,
+    stock: 0,
   })
-  const [errors, setErrors] = useState<Partial<ProductoFormData>>({})
+  const [errors, setErrors] = useState<ProductoFormErrors>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
 
   const isEditing = Boolean(product)
 
@@ -34,32 +36,61 @@ const ProductForm: React.FC<ProductFormProps> = ({
         codigo: product.codigo,
         nombre: product.nombre,
         precio: product.precio,
+        stock: product.stock || 0,
       })
     } else {
       setFormData({
         codigo: '',
         nombre: '',
         precio: 0,
+        stock: 0,
       })
     }
     setErrors({})
     setSubmitError('')
+    setSuccessMessage('')
   }, [product])
 
   const validateForm = (): boolean => {
-    const newErrors: Partial<ProductoFormData> = {}
+    console.log('🔧 Iniciando validación con datos:', formData)
+    const newErrors: ProductoFormErrors = {}
 
     if (!formData.codigo.trim()) {
       newErrors.codigo = 'El código es requerido'
+      console.log('❌ Error código: vacío')
     } else if (formData.codigo.trim().length < 2) {
       newErrors.codigo = 'El código debe tener al menos 2 caracteres'
+      console.log('❌ Error código: muy corto -', formData.codigo.length, 'caracteres')
+    } else {
+      console.log('✅ Código válido:', formData.codigo)
     }
 
     if (!formData.nombre.trim()) {
       newErrors.nombre = 'El nombre es requerido'
+      console.log('❌ Error nombre: vacío')
     } else if (formData.nombre.trim().length < 3) {
       newErrors.nombre = 'El nombre debe tener al menos 3 caracteres'
+      console.log('❌ Error nombre: muy corto -', formData.nombre.length, 'caracteres')
+    } else {
+      console.log('✅ Nombre válido:', formData.nombre)
     }
+
+    if (formData.precio < 0) {
+      newErrors.precio = 'El precio no puede ser negativo'
+      console.log('❌ Error precio: negativo -', formData.precio)
+    } else {
+      console.log('✅ Precio válido:', formData.precio)
+    }
+
+    if (formData.stock < 0) {
+      newErrors.stock = 'El stock no puede ser negativo'
+      console.log('❌ Error stock: negativo -', formData.stock)
+    } else {
+      console.log('✅ Stock válido:', formData.stock)
+    }
+
+    console.log('🔧 Errores encontrados:', newErrors)
+    console.log('🔧 Cantidad de errores:', Object.keys(newErrors).length)
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -68,7 +99,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
   const handleInputChange = (field: keyof ProductoFormData, value: string | number) => {
     setFormData(prev => ({
       ...prev,
-      [field]: field === 'precio' ? Number(value) : value
+      [field]: field === 'precio' || field === 'stock' ? Number(value) : value
     }))
     
     // Limpiar error del campo cuando el usuario empiece a escribir
@@ -80,33 +111,51 @@ const ProductForm: React.FC<ProductFormProps> = ({
     }
     
     setSubmitError('')
+    setSuccessMessage('')
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
+    console.log('🔧 ProductForm - handleSubmit iniciado')
+    console.log('🔧 FormData actual:', formData)
+    
     if (!validateForm()) {
+      console.log('❌ Validación fallida')
       return
     }
 
+    console.log('✅ Validación pasada')
+
     setIsSubmitting(true)
     setSubmitError('')
+    setSuccessMessage('')
 
     try {
+      console.log('🔧 Enviando datos del producto:', formData)
       const result = isEditing 
         ? await updateProduct(product!.id, formData)
         : await createProduct(formData)
 
       if (result.success) {
+        const message = isEditing ? 'Producto actualizado exitosamente' : 'Producto creado exitosamente'
+        setSuccessMessage(message)
+        console.log('✅', message)
+        
         onSuccess?.()
         if (!isEditing) {
           // Limpiar formulario si es creación
-          setFormData({ codigo: '', nombre: '', precio: 0 })
+          setFormData({ codigo: '', nombre: '', precio: 0, stock: 0 })
         }
+        
+        // Limpiar mensaje de éxito después de 3 segundos
+        setTimeout(() => setSuccessMessage(''), 3000)
       } else if (result.error) {
         setSubmitError(result.error)
+        console.error('❌ Error creando/actualizando producto:', result.error)
       }
     } catch (error) {
+      console.error('❌ Error inesperado:', error)
       setSubmitError('Error inesperado. Por favor intenta de nuevo.')
     } finally {
       setIsSubmitting(false)
@@ -128,6 +177,13 @@ const ProductForm: React.FC<ProductFormProps> = ({
         <div className="mb-4 bg-red-50 border border-red-200 rounded-md p-4">
           <h4 className="text-sm font-medium text-red-800">Error</h4>
           <p className="text-sm text-red-700 mt-1">{submitError}</p>
+        </div>
+      )}
+
+      {successMessage && (
+        <div className="mb-4 bg-green-50 border border-green-200 rounded-md p-4">
+          <h4 className="text-sm font-medium text-green-800">¡Éxito!</h4>
+          <p className="text-sm text-green-700 mt-1">{successMessage}</p>
         </div>
       )}
 
@@ -202,6 +258,30 @@ const ProductForm: React.FC<ProductFormProps> = ({
           </div>
           {errors.precio && (
             <p className="mt-1 text-sm text-red-600">{errors.precio}</p>
+          )}
+        </div>
+
+        <div>
+          <label htmlFor="stock" className="block text-sm font-medium text-gray-700">
+            Stock Inicial *
+          </label>
+          <input
+            type="number"
+            id="stock"
+            min="0"
+            value={formData.stock}
+            onChange={(e) => {
+              const value = e.target.value === '' ? 0 : parseInt(e.target.value);
+              handleInputChange('stock', value);
+            }}
+            className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm ${
+              errors.stock ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''
+            }`}
+            placeholder="0"
+            disabled={isSubmitting}
+          />
+          {errors.stock && (
+            <p className="mt-1 text-sm text-red-600">{errors.stock}</p>
           )}
         </div>
 

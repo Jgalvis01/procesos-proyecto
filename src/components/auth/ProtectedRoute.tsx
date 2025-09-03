@@ -4,6 +4,7 @@ import { Navigate, Outlet } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import type { UserRole } from '../../lib/supabase'
 import NavBar from './NavBar'
+import LoadingScreen from '../LoadingScreen'
 
 interface ProtectedRouteProps {
   requiredRoles?: UserRole[]
@@ -18,14 +19,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   // Mostrar loading mientras se verifica la autenticación
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-2 text-gray-600">Verificando permisos...</p>
-        </div>
-      </div>
-    )
+    return <LoadingScreen message="Verificando permisos..." />
   }
 
   // Redirigir al login si no hay usuario
