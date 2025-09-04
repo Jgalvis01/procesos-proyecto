@@ -38,6 +38,7 @@ body {
   }
 }
 
+
 .animate-fade-in {
   animation: fadeIn 0.3s ease-out;
 }
@@ -45,6 +46,8 @@ body {
 .animate-slide-in {
   animation: slideIn 0.3s ease-out;
 }
+
+
 
 /* Scrollbar personalizada */
 ::-webkit-scrollbar {

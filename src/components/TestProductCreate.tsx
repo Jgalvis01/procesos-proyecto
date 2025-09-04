@@ -1,10 +1,8 @@
 // Componente de prueba para verificar inserción directa en Supabase
 import React, { useState } from 'react'
-import { useAuth } from '../contexts/AuthContext'
 import { useProducts } from '../hooks/useProducts'
 
 const TestProductCreate: React.FC = () => {
-  const { org } = useAuth()
   const { createProduct } = useProducts()
   const [status, setStatus] = useState('')
   const [isLoading, setIsLoading] = useState(false)

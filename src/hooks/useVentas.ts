@@ -4,10 +4,6 @@ import { supabase } from '../lib/supabase'
 import { useStockValidation } from './useStockValidation'
 import { generateSaleNumber } from '../utils/formatters'
 import type { Venta } from '../lib/database.types'
-import type { Database } from '../lib/database.types'
-
-type DbResult<T> = T extends PromiseLike<infer U> ? U : never
-type DbResultOk<T> = T extends Promise<{ data: infer U }> ? U : never
 
 // Tipos para el formulario
 export interface VentaFormItem {
@@ -60,19 +56,21 @@ export const useVentas = (): UseVentasReturn => {
       const ventaData = {
         org_id: org.id,
         cliente_id: data.cliente_id,
-        numero: generateSaleNumber()
+        numero: generateSaleNumber(),
+        total: data.items.reduce((sum, item) => sum + (item.cantidad * item.precio_unitario), 0)
       }
 
-      const { data: ventaResult, error: ventaError } = await supabase
+      const { data: ventaResult, error: ventaError } = await (supabase as any)
         .from('venta')
         .insert([ventaData])
-        .select() as DbResult<ReturnType<typeof supabase.from<'venta'>>>
+        .select()
+        .single()
 
-      if (ventaError || !ventaResult || ventaResult.length === 0) {
+      if (ventaError || !ventaResult) {
         throw new Error(ventaError?.message || 'Error al crear la venta')
       }
 
-      const venta = ventaResult[0] as Venta
+      const venta = ventaResult
 
       // Crear los items de la venta
       const ventaItems = data.items.map(item => ({
@@ -82,13 +80,13 @@ export const useVentas = (): UseVentasReturn => {
         precio_unitario: item.precio_unitario
       }))
 
-      const { error: itemsError } = await supabase
+      const { error: itemsError } = await (supabase as any)
         .from('venta_item')
         .insert(ventaItems)
 
       if (itemsError) {
         // Si hay error al crear los items, eliminar la venta
-        await supabase
+        await (supabase as any)
           .from('venta')
           .delete()
           .match({ id: venta.id })

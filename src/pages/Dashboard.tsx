@@ -2,60 +2,11 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import CreateTestUsers from '../components/CreateTestUsers'
+import RoleSwitcher from '../components/RoleSwitcher'
 
 const DashboardPage: React.FC = () => {
-  const { hasPermission, user, org } = useAuth()
-
-  const stats = [
-    {
-      name: 'Ventas Hoy',
-      value: '$2,340,000',
-      change: '+4.75%',
-      changeType: 'positive',
-      icon: (
-        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-        </svg>
-      ),
-      color: 'text-success-600 bg-success-100'
-    },
-    {
-      name: 'Productos Activos',
-      value: '1,247',
-      change: '+2 nuevos',
-      changeType: 'positive',
-      icon: (
-        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-        </svg>
-      ),
-      color: 'text-primary-600 bg-primary-100'
-    },
-    {
-      name: 'Clientes Registrados',
-      value: '892',
-      change: '+12 esta semana',
-      changeType: 'positive',
-      icon: (
-        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-        </svg>
-      ),
-      color: 'text-secondary-600 bg-secondary-100'
-    },
-    {
-      name: 'Stock Bajo',
-      value: '23',
-      change: 'Requiere atención',
-      changeType: 'negative',
-      icon: (
-        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.232 15.5c-.77.833.192 2.5 1.732 2.5z" />
-        </svg>
-      ),
-      color: 'text-warning-600 bg-warning-100'
-    }
-  ]
+  const { hasPermission } = useAuth()
 
   const quickActions = [
     {
@@ -136,6 +87,17 @@ const DashboardPage: React.FC = () => {
           </Link>
         ))}
       </div>
+
+      {/* Solo mostrar herramientas de admin para administradores */}
+      {hasPermission(['admin']) && (
+        <div className="mt-12">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">Herramientas de Administrador</h2>
+          <div className="grid md:grid-cols-2 gap-8">
+            <CreateTestUsers />
+            <RoleSwitcher />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

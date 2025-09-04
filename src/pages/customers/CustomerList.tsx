@@ -1,14 +1,28 @@
 // src/pages/customers/CustomerList.tsx
-import React from 'react'
-import { Link } from 'react-router-dom'
+import React, { useState, useEffect } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { useCustomers } from '../../hooks/useCustomers'
 import { useAuth } from '../../contexts/AuthContext'
 
 const CustomerListPage: React.FC = () => {
   const { customers, loading, deleteCustomer } = useCustomers()
   const { hasPermission } = useAuth()
+  const location = useLocation()
+  const [successMessage, setSuccessMessage] = useState<string>('')
   
   const canManageCustomers = hasPermission(['admin', 'manager', 'cashier'])
+
+  // Mostrar mensaje de éxito si viene del estado de navegación
+  useEffect(() => {
+    if (location.state?.message) {
+      setSuccessMessage(location.state.message)
+      // Limpiar el estado después de 5 segundos
+      const timer = setTimeout(() => {
+        setSuccessMessage('')
+      }, 5000)
+      return () => clearTimeout(timer)
+    }
+  }, [location.state])
 
   const handleDelete = async (id: number, name: string) => {
     if (window.confirm(`¿Estás seguro de que quieres eliminar el cliente "${name}"?`)) {
@@ -46,6 +60,37 @@ const CustomerListPage: React.FC = () => {
           </Link>
         </div>
       </div>
+
+      {/* Mensaje de éxito */}
+      {successMessage && (
+        <div className="mb-6 bg-green-50 border border-green-200 rounded-md p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-green-800">
+                {successMessage}
+              </p>
+            </div>
+            <div className="ml-auto pl-3">
+              <div className="-mx-1.5 -my-1.5">
+                <button
+                  type="button"
+                  onClick={() => setSuccessMessage('')}
+                  className="inline-flex bg-green-50 rounded-md p-1.5 text-green-500 hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-green-50 focus:ring-green-600"
+                >
+                  <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Customers Table */}
       <div className="bg-white shadow overflow-hidden sm:rounded-md">

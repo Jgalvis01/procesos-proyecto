@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react'
 import { useCustomers } from '../../hooks/useCustomers'
 import  type { Cliente } from '../../lib/database.types'
-import { isValidEmail, isValidId, sanitizeString, formatId } from '../../utils/validators'
+import { isValidEmail, isValidId, sanitizeString } from '../../utils/validators'
 import type { ClienteFormData } from '../../hooks/useCustomers'
 interface CustomerFormProps {
   customer?: Cliente | null

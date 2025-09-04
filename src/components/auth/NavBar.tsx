@@ -1,6 +1,7 @@
 import React from 'react'
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
+import SessionStatusIndicator from '../SessionStatusIndicator'
 
 const NavBar: React.FC = () => {
   const { user, signOut, role } = useAuth()
@@ -76,7 +77,10 @@ const NavBar: React.FC = () => {
 
           {/* Menú de usuario */}
           <div className="flex items-center">
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-4">
+              {/* Indicador de estado de sesión */}
+              <SessionStatusIndicator />
+              
               <span className="text-sm text-gray-500">
                 {user?.email} ({role})
               </span>

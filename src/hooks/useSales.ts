@@ -47,11 +47,12 @@ export const useSales = (): UseSalesReturn => {
       setLoading(true)
       setError(null)
 
-      console.log('🔧 Intentando cargar ventas para org_id:', org.id)
+      console.log('🔧 DEBUG - Intentando cargar ventas para org_id:', org.id)
+      console.log('🔧 DEBUG - Org completa:', org)
       
       // Verificar autenticación antes de hacer la consulta
       const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-      console.log('🔧 Estado de sesión:', { 
+      console.log('🔧 DEBUG - Estado de sesión:', { 
         hasSession: !!session, 
         sessionError, 
         userId: session?.user?.id 
@@ -61,13 +62,19 @@ export const useSales = (): UseSalesReturn => {
         throw new Error('No hay sesión activa. Por favor, inicia sesión nuevamente.')
       }
 
+      console.log('🔧 DEBUG - Ejecutando consulta de ventas...')
       const { data, error } = await supabase
         .from('venta')
         .select('*')
         .eq('org_id', org.id)
         .order('created_at', { ascending: false })
 
-      console.log('🔧 Respuesta de consulta ventas:', { data, error })
+      console.log('🔧 DEBUG - Respuesta de consulta ventas:', { 
+        data, 
+        error, 
+        dataLength: data?.length,
+        firstSale: data?.[0]
+      })
 
       if (error) throw error
 

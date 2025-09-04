@@ -1,3 +1,3 @@
-// src/components/layout/index.ts
-export { default } from './Layout'
-export { default as Layout } from './Layout'
+import Layout from './Layout'
+export { Layout }
+export default Layout

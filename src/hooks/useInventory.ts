@@ -4,14 +4,9 @@ import { useAuth } from './useAuth'
 import type { Database } from '../lib/database.types'
 
 type ProductoRow = Database['public']['Tables']['producto']['Row']
-type VentaItemRow = Database['public']['Tables']['venta_item']['Row']
 
 interface ProductoInventario extends ProductoRow {
   stock: number
-}
-
-interface VentaItemExtendido extends VentaItemRow {
-  producto: ProductoRow
 }
 
 export function useInventory() {
@@ -46,40 +41,15 @@ export function useInventory() {
         console.log('🔧 Stock del primer producto:', (productos[0] as any).stock)
       }
 
-      // 2. Obtener todas las ventas de items para calcular el stock
-      const { data: ventasItems, error: ventasError } = await supabase
-        .from('venta_item')
-        .select(`
-          id,
-          venta_id,
-          producto_id,
-          cantidad,
-          precio_unitario,
-          created_at,
-          producto:producto_id(*)
-        `)
-        .eq('producto.org_id', org.id)
-
-      if (ventasError) throw ventasError
-      if (!ventasItems) throw new Error('Error al cargar ventas')
-
-      // 3. Calcular el stock por producto
+      // 2. El stock ya está siendo actualizado correctamente en la base de datos
+      // por el hook useSales, así que simplemente usamos el stock actual
       const inventario = (productos as ProductoRow[]).map(producto => {
-        const ventasDelProducto = (ventasItems as VentaItemExtendido[]).filter(
-          item => item.producto_id === producto.id
-        )
-        const stockVendido = ventasDelProducto.reduce(
-          (total, item) => total + item.cantidad,
-          0
-        )
-        
-        // Obtener stock inicial de la base de datos o usar 0 por defecto
-        const stockInicial = (producto as any).stock || 0
-        console.log(`🔧 Producto ${producto.nombre}: stockInicial=${stockInicial}, vendido=${stockVendido}`)
+        const stockActual = (producto as any).stock || 0
+        console.log(`🔧 Producto ${producto.nombre}: stock actual=${stockActual}`)
         
         return {
           ...producto,
-          stock: stockInicial - stockVendido // Stock real = inicial - vendido
+          stock: stockActual // Usar el stock actual de la base de datos
         }
       })
 

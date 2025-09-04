@@ -44,163 +44,147 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [org, setOrg] = useState<{ id: string; nombre: string } | null>(null)
   const [loading, setLoading] = useState(true)
 
-  console.log('🔧 AuthProvider - Current state:', { user: !!user, role, loading })
-
   useEffect(() => {
-    console.log('🔧 AuthProvider - useEffect iniciado')
-    
-    // Obtener sesión inicial con persistencia mejorada
+    let mounted = true
+
     const getInitialSession = async () => {
       try {
-        console.log('🔧 AuthProvider - Obteniendo sesión inicial...')
+        const { data: { session }, error } = await supabase.auth.getSession()
         
-        // Verificar si hay una sesión válida
-        const session = await supabase.auth.getSession()
-        if (session.data.session?.user) {
-          console.log('🔧 Sesión válida encontrada')
-          setUser(session.data.session.user as any)
-          
-          // Intentar obtener datos adicionales
-          try {
-            const { user: currentUser, role: userRole, org: userOrg } = await getCurrentUserWithRole()
-            if (currentUser && userRole && userOrg) {
-              setUser(currentUser)
-              setRole(userRole)
-              setOrg(userOrg)
-              console.log('✅ Datos completos del usuario obtenidos')
-            } else {
-              // Si no podemos obtener los datos adicionales, usar valores por defecto
-              console.warn('⚠️ No se pudieron obtener datos adicionales, usando valores por defecto')
-              setRole('cashier') // Rol por defecto
-              setOrg({ id: 'default', nombre: 'Organización Principal' })
-            }
-          } catch (roleError) {
-            console.warn('⚠️ Error obteniendo datos adicionales, usando valores por defecto:', roleError)
-            // Mantener la sesión básica con valores por defecto
-            setRole('cashier')
-            setOrg({ id: 'default', nombre: 'Organización Principal' })
-          }
-          
+        if (!mounted) return
+        
+        if (error) {
+          console.error('Error obteniendo sesión:', error)
           setLoading(false)
           return
         }
         
-        // Si no hay sesión válida, mostrar login
-        console.log('❌ No hay sesión válida, mostrando login')
-        setUser(null)
-        setRole(null)
-        setOrg(null)
+        if (session?.user) {
+          setUser(session.user)
+          
+          // Obtener datos adicionales con protección contra bucles
+          getCurrentUserWithRole()
+            .then(({ user: currentUser, role: userRole, org: userOrg }) => {
+              if (!mounted) return
+              
+              console.log('🔍 AuthContext: Datos obtenidos:', { 
+                hasUser: !!currentUser, 
+                role: userRole, 
+                hasOrg: !!userOrg 
+              })
+              
+              if (currentUser) {
+                setUser(currentUser)
+                setRole(userRole || 'cashier')  // Default seguro
+                setOrg(userOrg || { id: '1', nombre: 'Default Org' }) // Default seguro
+              } else {
+                console.log('⚠️ AuthContext: No se obtuvieron datos de usuario')
+                setUser(session.user)
+                setRole('cashier') // Default seguro
+                setOrg({ id: '1', nombre: 'Default Org' })
+              }
+            })
+            .catch((error) => {
+              if (!mounted) return
+              console.log('❌ AuthContext: Error obteniendo datos:', error)
+              setRole('cashier')
+              setOrg({ id: '1', nombre: 'Default Org' })
+            })
+        } else {
+          setUser(null)
+          setRole(null)
+          setOrg(null)
+        }
+        
         setLoading(false)
         
       } catch (error) {
-        console.error('❌ Error crítico en sesión inicial:', error)
-        setUser(null)
-        setRole(null)
-        setOrg(null)
-        setLoading(false)
+        console.error('Error en sesión inicial:', error)
+        if (mounted) {
+          setLoading(false)
+        }
       }
     }
 
     getInitialSession()
 
-    // Escuchar cambios de autenticación
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('🔧 Auth state change:', event, !!session)
+        if (!mounted) return
         
         if (event === 'SIGNED_IN' && session?.user) {
-          setUser(session.user as any)
+          setUser(session.user)
           
-          try {
-            const { user: currentUser, role: userRole, org: userOrg } = await getCurrentUserWithRole()
-            if (currentUser && userRole && userOrg) {
-              setUser(currentUser)
-              setRole(userRole)
-              setOrg(userOrg)
-              console.log('✅ Login completo exitoso')
-            } else {
-              // Usar valores por defecto si no se pueden obtener
-              setRole('cashier')
-              setOrg({ id: 'default', nombre: 'Organización Principal' })
-              console.log('✅ Login con valores por defecto')
-            }
-          } catch (error) {
-            console.warn('⚠️ Error obteniendo datos adicionales en login:', error)
-            setRole('cashier')
-            setOrg({ id: 'default', nombre: 'Organización Principal' })
-          }
+          getCurrentUserWithRole()
+            .then(({ user: currentUser, role: userRole, org: userOrg }) => {
+              if (!mounted) return
+              if (currentUser && userRole && userOrg) {
+                setUser(currentUser)
+                setRole(userRole)
+                setOrg(userOrg)
+              } else {
+                setRole('cashier')
+                setOrg({ id: '550e8400-e29b-41d4-a716-446655440000', nombre: 'Organización Principal' })
+              }
+            })
+            .catch(() => {
+              if (mounted) {
+                setRole('cashier')
+                setOrg({ id: '550e8400-e29b-41d4-a716-446655440000', nombre: 'Organización Principal' })
+              }
+            })
         } else if (event === 'SIGNED_OUT') {
-          console.log('🔓 Usuario cerró sesión manualmente')
           setUser(null)
           setRole(null)
           setOrg(null)
-        } else if (event === 'TOKEN_REFRESHED') {
-          console.log('� Token refrescado - sesión manteniéndose')
-          // No limpiar el estado en refresh de token
         }
+        
         setLoading(false)
       }
     )
 
     return () => {
+      mounted = false
       subscription.unsubscribe()
     }
   }, [])
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string): Promise<{ error?: string }> => {
     try {
       setLoading(true)
-      console.log('🔑 Intentando iniciar sesión...')
-      
-      // Limpiar cualquier sesión previa corrupta
-      await supabase.auth.signOut()
-      localStorage.clear()
-      
+
       const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+        email: email.trim(),
+        password
       })
-      
+
       if (error) {
-        console.error('❌ Error en login:', error.message)
+        setLoading(false)
         return { error: error.message }
       }
 
-      console.log('✅ Login exitoso')
-      // La actualización del estado se maneja en el listener onAuthStateChange
       return {}
     } catch (error) {
-      console.error('❌ Error inesperado en login:', error)
-      return { error: 'Error inesperado al iniciar sesión' }
-    } finally {
       setLoading(false)
+      return { error: 'Error inesperado en el login' }
     }
   }
 
-  const signOut = async () => {
+  const signOut = async (): Promise<void> => {
     try {
       setLoading(true)
-      console.log('🔓 Cerrando sesión...')
       
-      // Limpiar localStorage antes de cerrar sesión
-      localStorage.clear()
+      const { error } = await supabase.auth.signOut()
+      if (error) {
+        console.error('Error al cerrar sesión:', error)
+      }
       
-      await supabase.auth.signOut()
-      
-      // Asegurar que el estado se limpia
       setUser(null)
       setRole(null)
       setOrg(null)
-      
-      console.log('✅ Sesión cerrada y estado limpiado')
+      setLoading(false)
     } catch (error) {
-      console.error('❌ Error signing out:', error)
-      // Aún así limpiar el estado local
-      localStorage.clear()
-      setUser(null)
-      setRole(null)
-      setOrg(null)
-    } finally {
+      console.error('Error cerrando sesión:', error)
       setLoading(false)
     }
   }
@@ -210,41 +194,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return requiredRoles.includes(role)
   }
 
-  // Función para refrescar sesión cuando hay errores de autenticación
-  const refreshSession = async () => {
-    console.log('🔄 Refrescando sesión...')
+  const refreshSession = async (): Promise<void> => {
     try {
-      const { data: { session }, error } = await supabase.auth.getSession()
-      
-      if (error || !session) {
-        console.log('❌ No se pudo refrescar la sesión, limpiando estado')
-        setUser(null)
-        setRole(null)
-        setOrg(null)
-        return
-      }
-
-      console.log('✅ Sesión refrescada exitosamente')
-      setUser(session.user as any)
-      
-      // Intentar obtener datos adicionales
-      try {
-        const { user: currentUser, role: userRole, org: userOrg } = await getCurrentUserWithRole()
-        if (currentUser && userRole && userOrg) {
-          setUser(currentUser)
-          setRole(userRole)
-          setOrg(userOrg)
-        } else {
-          setRole('cashier')
-          setOrg({ id: 'default', nombre: 'Organización Principal' })
-        }
-      } catch (roleError) {
-        console.warn('⚠️ Error obteniendo datos adicionales en refresh:', roleError)
-        setRole('cashier')
-        setOrg({ id: 'default', nombre: 'Organización Principal' })
+      const { error } = await supabase.auth.refreshSession()
+      if (error) {
+        console.error('Error refrescando sesión:', error)
       }
     } catch (error) {
-      console.error('❌ Error refrescando sesión:', error)
+      console.error('Error en refreshSession:', error)
     }
   }
 
