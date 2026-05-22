@@ -44,6 +44,11 @@ test('3-buy-gaseosa',async({page})=>{
   await expect(page.getByText('Total (3 items)'));
   await page.getByText('Finalizar Venta').click();
   await expect(page).toHaveURL('sales');
+  const { data } = await supabase
+    .from('producto')
+    .select('stock')
+    .eq('id', 19);
+  await expect(data[0]).toEqual({stock:0});
 }); test('4-buy-gaseosa',async({page})=>{
   await page.getByText('+').click();
   await expect(page.getByText('Stock insuficiente. Stock disponible: 3')).toBeVisible();
